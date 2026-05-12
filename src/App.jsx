@@ -227,7 +227,6 @@ const App = () => {
             <Route path="/" element={<Login />} />
             <Route path="/register" element={<Register />} />
 
-            {/* Dashboard Route */}
             <Route
               path="/dashboard"
               element={
@@ -240,7 +239,6 @@ const App = () => {
               }
             />
 
-            {/* Wallet & Coins */}
             <Route path="/wallet" element={<WalletPage />} />
             <Route
               path="/coin"
