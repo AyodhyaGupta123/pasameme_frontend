@@ -1,0 +1,11 @@
+PNG PLACEHOLDER NEEDED
+
+This file must be a real binary PNG image (not text). In this chat response I can only output plain text, which would corrupt `pwa-192x192.png`.
+
+Do this locally instead (fastest):
+1) Create a 192x192 PNG icon (any image editor), name it exactly: `pwa-192x192.png`
+2) Put it here: `MEME\Meme-Frontend\public\icons\pwa-192x192.png`
+
+If you want an automated way, tell me which you prefer:
+- Generate icons from an existing logo file you already have (send me the logo path/name), or
+- I’ll give you a one-command script (Node/PowerShell) that generates valid PNGs in the correct folder.
