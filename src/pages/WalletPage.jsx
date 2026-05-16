@@ -458,9 +458,9 @@ const WalletPage = () => {
           </div>
         </section>
 
-        <section>
+        {/* <section>
           <ManualQRCode />
-        </section>
+        </section> */}
       </main>
 
       <footer className="mt-12 py-6 text-center text-xs text-slate-500">
