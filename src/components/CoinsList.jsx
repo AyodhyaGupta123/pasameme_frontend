@@ -3,10 +3,24 @@ import { useNavigate } from "react-router-dom";
 import Header from "./Header";
 import LeftSidebar from "./LeftSidebar";
 
-const symbols = [
-  "DOGE", "SHIB", "PEPE", "WIF", "FLOKI",
-  "BONK", "BRETT", "POPCAT", "MOG", "BOME",
+const memeCoinsDefinition = [
+  { symbol: "DOGE", name: "Dogecoin" },
+  { symbol: "SHIB", name: "Shiba Inu" },
+  { symbol: "PEPE", name: "Pepe" },
+  { symbol: "FLOKI", name: "Floki" },
+  { symbol: "WIF", name: "Wif" },
+  { symbol: "BONK", name: "Bonk" },
+  { symbol: "BRETT", name: "Brett" },
+  { symbol: "POPCAT", name: "Popcat" },
+  { symbol: "MOG", name: "Mog" },
+  { symbol: "BOME", name: "Bome" },
+  { symbol: "BABYDOGE", name: "Baby Doge" },
+  { symbol: "SAFEMOON", name: "SafeMoon" },
+  { symbol: "WOJAK", name: "Wojak" },
+  { symbol: "BONE", name: "Bone" },
+  { symbol: "PEPE2", name: "Pepe 2" },
 ];
+const symbols = memeCoinsDefinition.map((coin) => coin.symbol);
 const streams = symbols.map((s) => `${s.toLowerCase()}usdt@ticker`).join("/");
 
 // ── Responsive hook ──────────────────────────────────────────
