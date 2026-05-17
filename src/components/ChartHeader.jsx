@@ -28,6 +28,12 @@ const ChartHeader = ({ currentPrice, selectedCoin, ticker = {} }) => {
     });
   };
 
+  const formatChange = (value) => {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return "--";
+    return `${num >= 0 ? "+" : ""}${num.toFixed(2)}%`;
+  };
+
   const formatVolume = (value) => {
     if (!value || !Number.isFinite(value)) return "--";
 
@@ -39,18 +45,18 @@ const ChartHeader = ({ currentPrice, selectedCoin, ticker = {} }) => {
   };
 
   return (
-    <div className="min-h-[68px] bg-[#0B0E11] border-b border-[#262930] px-3 sm:px-4 py-2 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-3 shrink-0 w-full">
+    <div className="min-h-17 bg-[#0B0E11] border-b border-[#262930] px-3 sm:px-4 py-2 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-3 shrink-0 w-full">
       <div className="flex items-center gap-4 sm:gap-6 flex-wrap">
         <div>
           <h1 className="text-base sm:text-lg font-black flex items-center gap-2 whitespace-nowrap text-white">
             {coinSymbol}/USDT
             <span className="text-[9px] text-[#FCD535] px-1.5 py-0.5 rounded bg-[#FCD535]/10 border border-[#FCD535]/20">
-              PERP
+              SPOT
             </span>
           </h1>
 
           <p className="text-[10px] text-slate-500 font-mono">
-            Perpetual Contract
+            Spot market price
           </p>
         </div>
 
@@ -79,8 +85,7 @@ const ChartHeader = ({ currentPrice, selectedCoin, ticker = {} }) => {
               isPositive ? "text-[#0ECB81]" : "text-[#F6465D]"
             }`}
           >
-            {isPositive ? "+" : ""}
-            {change24h.toFixed(2)}%
+            {formatChange(change24h)}
           </p>
         </div>
 

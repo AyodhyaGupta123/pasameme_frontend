@@ -1,9 +1,8 @@
 import React, { Suspense, lazy, useState, useEffect } from "react";
+import { COIN_SOURCE_MAP } from "./config/coinSources";
 const FaqPage = lazy(() => import("./pages/FaqPage"));
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext.jsx";
-
-import config from "./config/config";
 
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
@@ -38,65 +37,85 @@ const App = () => {
     }
   }, [selectedCoin]);
 
- useEffect(() => {
-  let socket;
-  let reconnectTimeout;
-  let isUnmounted = false;
+  const selectedSymbol = selectedCoin?.symbol?.toUpperCase();
+  const coinInfo = COIN_SOURCE_MAP[selectedSymbol];
+  const isBinance = coinInfo?.exchange === "BINANCE";
+  const symbolPair = coinInfo?.symbolPair?.toLowerCase() || `${selectedSymbol?.toLowerCase()}usdt`;
 
-  const symbol = selectedCoin.symbol.toLowerCase() + "usdt";
-
-  const connect = () => {
-    socket = new WebSocket(
-      `wss://stream.binance.com:9443/ws/${symbol}@ticker`
-    );
-
-    socket.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-
-        const livePrice = Number(data.c); // current price
-
-        if (!Number.isNaN(livePrice)) {
-          setCurrentPrice(livePrice);
-
-          setInputPrice(
-            livePrice.toLocaleString(undefined, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })
-          );
-        }
-
-        // ✅ REAL 24h DATA
-        setTickerData({
-          change24h: Number(data.P), // %
-          high24h: Number(data.h),
-          low24h: Number(data.l),
-          volume: Number(data.v),
-        });
-
-      } catch (error) {
-        console.error("Ticker socket error:", error);
-      }
-    };
-
-    socket.onclose = () => {
-      if (!isUnmounted) {
-        reconnectTimeout = setTimeout(connect, 2000);
-      }
-    };
-  };
-
-  connect();
-
-  return () => {
-    isUnmounted = true;
-    clearTimeout(reconnectTimeout);
-    if (socket && socket.readyState <= 1) {
-      socket.close();
+  useEffect(() => {
+    if (!isBinance) {
+      const timer = window.setTimeout(() => {
+        setCurrentPrice(null);
+        setInputPrice("");
+        setTickerData({});
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
-  };
-}, [selectedCoin]);
+  }, [isBinance]);
+
+  useEffect(() => {
+    let socket;
+    let reconnectTimeout;
+    let isUnmounted = false;
+
+    if (!isBinance) {
+      return;
+    }
+
+    const connect = () => {
+      socket = new WebSocket(`wss://stream.binance.com:9443/ws/${symbolPair}@ticker`);
+
+      socket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+
+          const livePrice = Number(data.c); // current price
+
+          if (!Number.isNaN(livePrice)) {
+            setCurrentPrice(livePrice);
+
+            setInputPrice(
+              livePrice.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })
+            );
+          }
+
+          setTickerData({
+            change24h: Number(data.P),
+            high24h: Number(data.h),
+            low24h: Number(data.l),
+            volume: Number(data.v),
+          });
+        } catch (error) {
+          console.error("Ticker socket error:", error);
+        }
+      };
+
+      socket.onerror = () => {
+        if (!isUnmounted) {
+          reconnectTimeout = setTimeout(connect, 2000);
+        }
+      };
+
+      socket.onclose = () => {
+        if (!isUnmounted) {
+          reconnectTimeout = setTimeout(connect, 2000);
+        }
+      };
+    };
+
+    connect();
+
+    return () => {
+      isUnmounted = true;
+      clearTimeout(reconnectTimeout);
+      if (socket && socket.readyState <= 1) {
+        socket.close();
+      }
+    };
+  }, [isBinance, symbolPair]);
 
   const handleOpenModal = (type) => {
     setOrderType(type);
@@ -174,7 +193,7 @@ const App = () => {
           </div>
         )}
 
-       <aside className="w-full xl:w-[360px] bg-[#15181C] border-l border-[#262930] flex flex-col shrink-0 overflow-hidden">
+       <aside className="w-full xl:w-90 bg-[#15181C] border-l border-[#262930] flex flex-col shrink-0 overflow-hidden">
           {(activeSection === "chart" || activeSection === "order") && (
             <Orderbook currentPrice={currentPrice} />
           )}

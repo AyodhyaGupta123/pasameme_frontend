@@ -1,32 +1,20 @@
 import React, { useEffect, useRef } from "react";
+import { COIN_SOURCE_MAP } from "../config/coinSources";
 
 const TradingViewChart = ({ selectedCoin }) => {
   const containerRef = useRef(null);
 
-  const symbolMap = {
-    BTC: "BINANCE:BTCUSDT.P",
-    ETH: "BINANCE:ETHUSDT.P",
-    DOGE: "BINANCE:DOGEUSDT.P",
-    SHIB: "BINANCE:SHIBUSDT.P",
-    PEPE: "BINANCE:PEPEUSDT.P",
-    WIF: "BINANCE:WIFUSDT.P",
-    FLOKI: "BINANCE:FLOKIUSDT.P",
-    BONK: "BINANCE:BONKUSDT.P",
-    BRETT: "BITGET:BRETTUSDT.P",
-    POPCAT: "BINANCE:POPCATUSDT.P",
-    MOG: "BITGET:MOGUSDT.P",
-    BOME: "BINANCE:BOMEUSDT.P",
-  };
-
-  const tvSymbol = symbolMap[selectedCoin?.symbol] || symbolMap.BTC;
+  const selectedSymbol = selectedCoin?.symbol?.toUpperCase();
+  const tvSymbol = COIN_SOURCE_MAP[selectedSymbol]?.chartSymbol || null;
 
   useEffect(() => {
     const containerId = "tradingview_chart";
+    const container = containerRef.current;
 
     const createWidget = () => {
-      if (!window.TradingView || !containerRef.current) return;
+      if (!window.TradingView || !container || !tvSymbol) return;
 
-      containerRef.current.innerHTML = "";
+      container.innerHTML = "";
 
       new window.TradingView.widget({
         autosize: true,
@@ -67,14 +55,25 @@ const TradingViewChart = ({ selectedCoin }) => {
     }
 
     return () => {
-      if (containerRef.current) {
-        containerRef.current.innerHTML = "";
+      if (container) {
+        container.innerHTML = "";
       }
     };
   }, [tvSymbol]);
 
+  if (!tvSymbol) {
+    return (
+      <div className="w-full h-87.5 md:h-full md:flex-1 bg-[#0B0E11] border-b border-[#262930] text-center text-[#d0d4da] flex items-center justify-center px-4">
+        <div>
+          <p className="text-sm font-semibold">Chart unavailable for {selectedSymbol || "this symbol"}.</p>
+          <p className="text-xs text-slate-500 mt-1">This coin is not currently connected to a supported chart source.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="w-full h-[350px] md:h-full md:flex-1 bg-[#0B0E11] border-b border-[#262930] overflow-hidden">
+    <div className="w-full h-87.5 md:h-full md:flex-1 bg-[#0B0E11] border-b border-[#262930] overflow-hidden">
       <div className="tradingview-widget-container h-full w-full">
         <div
           id="tradingview_chart"

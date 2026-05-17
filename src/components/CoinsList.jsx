@@ -2,26 +2,9 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "./Header";
 import LeftSidebar from "./LeftSidebar";
+import { MEME_COIN_DATA, COIN_SOURCE_MAP, getBinanceStreamUrl } from "../config/coinSources";
 
-const memeCoinsDefinition = [
-  { symbol: "DOGE", name: "Dogecoin" },
-  { symbol: "SHIB", name: "Shiba Inu" },
-  { symbol: "PEPE", name: "Pepe" },
-  { symbol: "FLOKI", name: "Floki" },
-  { symbol: "WIF", name: "Wif" },
-  { symbol: "BONK", name: "Bonk" },
-  { symbol: "BRETT", name: "Brett" },
-  { symbol: "POPCAT", name: "Popcat" },
-  { symbol: "MOG", name: "Mog" },
-  { symbol: "BOME", name: "Bome" },
-  { symbol: "BABYDOGE", name: "Baby Doge" },
-  { symbol: "SAFEMOON", name: "SafeMoon" },
-  { symbol: "WOJAK", name: "Wojak" },
-  { symbol: "BONE", name: "Bone" },
-  { symbol: "PEPE2", name: "Pepe 2" },
-];
-const symbols = memeCoinsDefinition.map((coin) => coin.symbol);
-const streams = symbols.map((s) => `${s.toLowerCase()}usdt@ticker`).join("/");
+const binanceStreamUrl = getBinanceStreamUrl();
 
 // ── Responsive hook ──────────────────────────────────────────
 const useIsMobile = () => {
@@ -37,7 +20,7 @@ const useIsMobile = () => {
 // ── Zigzag Sparkline ─────────────────────────────────────────
 const Sparkline = ({ up, symbol, width = 64 }) => {
   const H = 24, POINTS = 10;
-  const color = up ? "#02c076" : "#f6465d";
+  const color = up === true ? "#02c076" : up === false ? "#f6465d" : "#6b7280";
   const seed = symbol ? symbol.charCodeAt(0) + (symbol.charCodeAt(1) || 0) : 42;
   const seededRand = (i) => Math.sin(seed * 9301 + i * 49297) * 0.5 + 0.5;
 
@@ -50,8 +33,8 @@ const Sparkline = ({ up, symbol, width = 64 }) => {
       raw.push(val);
     }
     const first = raw[0], last = raw[raw.length - 1];
-    if (up && last < first) raw[raw.length - 1] = first + Math.abs(lastSwing) * 0.6;
-    if (!up && last > first) raw[raw.length - 1] = first - Math.abs(lastSwing) * 0.6;
+    if (up === true && last < first) raw[raw.length - 1] = first + Math.abs(lastSwing) * 0.6;
+    if (up === false && last > first) raw[raw.length - 1] = first - Math.abs(lastSwing) * 0.6;
     return raw;
   });
 
@@ -65,7 +48,7 @@ const Sparkline = ({ up, symbol, width = 64 }) => {
       });
     }, 1800 + (seed % 600));
     return () => clearInterval(id);
-  }, [up]);
+  }, [up, seed]);
 
   const minP = Math.min(...prices), maxP = Math.max(...prices);
   const range = maxP - minP || 1, pad = 3;
@@ -141,12 +124,43 @@ const MemeCoinsList = ({ setSelectedCoin }) => {
     }
   };
 
+  const renderChangeChip = (value, multiplier = 1) => {
+    const num = Number(value);
+
+    if (!Number.isFinite(num)) {
+      return (
+        <span style={{ fontSize: 12, fontWeight: 600, color: "#848e9c" }}>
+          --
+        </span>
+      );
+    }
+
+    const result = num * multiplier;
+    const positive = result >= 0;
+
+    return (
+      <span style={{
+        fontSize: 12,
+        fontWeight: 600,
+        color: positive ? "#02c076" : "#f6465d",
+        background: positive ? "rgba(2,192,118,0.08)" : "rgba(246,70,93,0.08)",
+        padding: "2px 6px",
+        borderRadius: 4,
+      }}>
+        {positive ? "+" : ""}{result.toFixed(2)}%
+      </span>
+    );
+  };
+
   const [memeCoins, setMemeCoins] = useState(() =>
-    symbols.map((symbol, i) => ({
-      symbol, name: symbol,
-      price: "0.00", change: "0.00",
-      up: true, rank: i + 1,
-      localIcon: getLocalIcon(symbol),
+    MEME_COIN_DATA.map((coin, i) => ({
+      symbol: coin.symbol,
+      name: coin.name,
+      price: "--",
+      change: "--",
+      up: null,
+      rank: i + 1,
+      localIcon: getLocalIcon(coin.symbol),
     }))
   );
   const [loading, setLoading] = useState(true);
@@ -155,7 +169,8 @@ const MemeCoinsList = ({ setSelectedCoin }) => {
   useEffect(() => {
     let socket, reconnectTimeout, isUnmounted = false;
     const connect = () => {
-      socket = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`);
+      if (!binanceStreamUrl) return;
+      socket = new WebSocket(binanceStreamUrl);
       socket.onmessage = (event) => {
         try {
           const { data: ticker } = JSON.parse(event.data);
@@ -166,18 +181,76 @@ const MemeCoinsList = ({ setSelectedCoin }) => {
           setMemeCoins((prev) => prev.map((coin) =>
             coin.symbol !== symbol ? coin : {
               ...coin,
-              price: isNaN(priceValue) ? coin.price : priceValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 }),
-              change: isNaN(changePercent) ? coin.change : changePercent.toFixed(2),
-              up: !isNaN(changePercent) && changePercent >= 0,
+              price: Number.isFinite(priceValue)
+                ? priceValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })
+                : coin.price,
+              change: Number.isFinite(changePercent) ? changePercent.toFixed(2) : coin.change,
+              up: Number.isFinite(changePercent) ? changePercent >= 0 : coin.up,
             }
           ));
           setLoading(false);
-        } catch (e) { console.error(e); }
+        } catch (e) {
+          console.error(e);
+        }
       };
-      socket.onclose = () => { if (!isUnmounted) reconnectTimeout = setTimeout(connect, 2000); };
+      socket.onerror = () => {
+        if (!isUnmounted) reconnectTimeout = setTimeout(connect, 2000);
+      };
+      socket.onclose = () => {
+        if (!isUnmounted) reconnectTimeout = setTimeout(connect, 2000);
+      };
     };
     connect();
     return () => { isUnmounted = true; clearTimeout(reconnectTimeout); if (socket?.readyState <= 1) socket.close(); };
+  }, []);
+
+  useEffect(() => {
+    const fallbackIds = MEME_COIN_DATA.filter((coin) => coin.exchange !== "BINANCE" && coin.coingeckoId)
+      .map((coin) => coin.coingeckoId);
+    if (!fallbackIds.length) return;
+
+    let active = true;
+    const loadFallbackPrices = async () => {
+      try {
+        const marketResponse = await fetch(
+          `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${encodeURIComponent(
+            fallbackIds.join(",")
+          )}&price_change_percentage=24h`
+        );
+        const markets = await marketResponse.json();
+        if (!active || !Array.isArray(markets)) return;
+
+        const marketById = markets.reduce((map, item) => {
+          map[item.id] = item;
+          map[item.symbol.toUpperCase()] = item;
+          return map;
+        }, {});
+
+        setMemeCoins((prev) => prev.map((coin) => {
+          const source = COIN_SOURCE_MAP[coin.symbol];
+          if (source?.exchange === "BINANCE") return coin;
+
+          const market = marketById[source?.coingeckoId] || marketById[coin.symbol.toUpperCase()];
+          if (!market) return coin;
+
+          const changePercent = Number(market.price_change_percentage_24h);
+          return {
+            ...coin,
+            price: Number.isFinite(market.current_price)
+              ? market.current_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })
+              : coin.price,
+            change: Number.isFinite(changePercent) ? changePercent.toFixed(2) : coin.change,
+            up: Number.isFinite(changePercent) ? changePercent >= 0 : coin.up,
+          };
+        }));
+        setLoading(false);
+      } catch (error) {
+        console.error("CoinGecko fallback error:", error);
+      }
+    };
+
+    loadFallbackPrices();
+    return () => { active = false; };
   }, []);
 
   // ── MOBILE LAYOUT ──────────────────────────────────────────
@@ -278,15 +351,7 @@ const MemeCoinsList = ({ setSelectedCoin }) => {
 
                   {/* Change badge */}
                   <div style={{ textAlign: "right" }}>
-                    <span style={{
-                      display: "inline-block",
-                      fontSize: 11, fontWeight: 700,
-                      color: coin.up ? "#02c076" : "#f6465d",
-                      background: coin.up ? "rgba(2,192,118,0.1)" : "rgba(246,70,93,0.1)",
-                      padding: "3px 7px", borderRadius: 5,
-                    }}>
-                      {coin.up ? "+" : ""}{coin.change}%
-                    </span>
+                    {renderChangeChip(coin.change)}
                   </div>
                 </div>
               ))
@@ -426,15 +491,11 @@ const MemeCoinsList = ({ setSelectedCoin }) => {
                     <div style={{ textAlign: "right", fontSize: 13, fontWeight: 600, color: "#eaeaeb" }}>${coin.price}</div>
 
                     <div style={{ textAlign: "right" }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: coin.up ? "#02c076" : "#f6465d", background: coin.up ? "rgba(2,192,118,0.08)" : "rgba(246,70,93,0.08)", padding: "2px 6px", borderRadius: 4 }}>
-                        {coin.up ? "+" : ""}{(parseFloat(coin.change) * 0.3).toFixed(2)}%
-                      </span>
+                      {renderChangeChip(coin.change, 0.3)}
                     </div>
 
                     <div style={{ textAlign: "right" }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: coin.up ? "#02c076" : "#f6465d", background: coin.up ? "rgba(2,192,118,0.08)" : "rgba(246,70,93,0.08)", padding: "2px 6px", borderRadius: 4 }}>
-                        {coin.up ? "+" : ""}{coin.change}%
-                      </span>
+                      {renderChangeChip(coin.change)}
                     </div>
 
                     <div style={{ display: "flex", justifyContent: "flex-end" }}>

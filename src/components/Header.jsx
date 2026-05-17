@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
+import { COIN_SOURCE_MAP } from "../config/coinSources";
 
 const Header = ({ selectedCoin: selectedCoinProp }) => {
   const { user, logout } = useAuth();
@@ -28,7 +29,10 @@ const Header = ({ selectedCoin: selectedCoinProp }) => {
     selectedCoinProp ||
     JSON.parse(localStorage.getItem("selectedCoin") || '{"symbol":"BTC"}');
 
-  const symbol = selectedCoin?.symbol?.toUpperCase() || "BTC";
+  const selectedSymbol = selectedCoin?.symbol?.toUpperCase() || "BTC";
+  const coinInfo = COIN_SOURCE_MAP[selectedSymbol];
+  const isBinance = coinInfo?.exchange === "BINANCE";
+  const streamSymbol = coinInfo?.symbolPair?.toLowerCase() || `${selectedSymbol.toLowerCase()}usdt`;
   const isPositive = market.change24h >= 0;
 
   useEffect(() => {
@@ -43,10 +47,10 @@ const Header = ({ selectedCoin: selectedCoinProp }) => {
     let isUnmounted = false;
 
     const connect = () => {
-      const streamSymbol = `${symbol.toLowerCase()}usdt@ticker`;
+      if (!isBinance) return;
 
       socket = new WebSocket(
-        `wss://stream.binance.com:9443/ws/${streamSymbol}`
+        `wss://stream.binance.com:9443/ws/${streamSymbol}@ticker`
       );
 
       socket.onmessage = (event) => {
@@ -89,6 +93,18 @@ const Header = ({ selectedCoin: selectedCoinProp }) => {
       };
     };
 
+    if (!isBinance) {
+      previousPriceRef.current = null;
+      setMarket({
+        price: null,
+        change24h: 0,
+        high24h: 0,
+        low24h: 0,
+        volume: 0,
+      });
+      return;
+    }
+
     connect();
 
     return () => {
@@ -96,7 +112,7 @@ const Header = ({ selectedCoin: selectedCoinProp }) => {
       clearTimeout(reconnectTimeout);
       if (socket && socket.readyState <= 1) socket.close();
     };
-  }, [symbol]);
+  }, [selectedSymbol, streamSymbol, isBinance]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -119,7 +135,7 @@ const Header = ({ selectedCoin: selectedCoinProp }) => {
   const formatPrice = (value) => {
     const num = Number(value);
 
-    if (!num || !Number.isFinite(num)) return "--";
+    if (!Number.isFinite(num)) return "--";
 
     return num.toLocaleString("en-US", {
       minimumFractionDigits: num < 1 ? 6 : 2,
@@ -130,12 +146,18 @@ const Header = ({ selectedCoin: selectedCoinProp }) => {
   const formatVolume = (value) => {
     const num = Number(value);
 
-    if (!num || !Number.isFinite(num)) return "--";
+    if (!Number.isFinite(num)) return "--";
     if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(2)}B`;
     if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(2)}M`;
     if (num >= 1_000) return `${(num / 1_000).toFixed(2)}K`;
 
     return num.toFixed(2);
+  };
+
+  const formatChange = (value) => {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return "--";
+    return `${num >= 0 ? "+" : ""}${num.toFixed(2)}%`;
   };
 
   const getInitials = (userData) => {
@@ -161,7 +183,7 @@ const Header = ({ selectedCoin: selectedCoinProp }) => {
   })();
 
   return (
-    <header className="sticky top-0 z-[100] w-full border-b border-[#262930] bg-[#0B0E11]/95 backdrop-blur-xl">
+    <header className="sticky top-0 z-100 w-full border-b border-[#262930] bg-[#0B0E11]/95 backdrop-blur-xl">
       <div className="h-16 px-3 sm:px-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <Link
@@ -176,17 +198,17 @@ const Header = ({ selectedCoin: selectedCoinProp }) => {
           </Link>
 
           <div className="hidden lg:flex items-center gap-4 rounded-xl border border-[#262930] bg-[#15181C] px-4 py-2 shadow-sm">
-            <div className="min-w-[90px]">
+            <div className="min-w-22.5">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-black text-white">
-                  {symbol}/USDT
+                  {selectedSymbol}/USDT
                 </span>
                 <span className="rounded border border-[#FCD535]/20 bg-[#FCD535]/10 px-1.5 py-0.5 text-[9px] font-bold text-[#FCD535]">
-                  PERP
+                  SPOT
                 </span>
               </div>
               <p className="mt-0.5 font-mono text-[10px] text-slate-500">
-                Live Market
+                Spot market price
               </p>
             </div>
 
@@ -211,8 +233,7 @@ const Header = ({ selectedCoin: selectedCoinProp }) => {
                   : "bg-[#F6465D]/10 text-[#F6465D]"
               }`}
             >
-              {isPositive ? "+" : ""}
-              {market.change24h.toFixed(2)}%
+              {formatChange(market.change24h)}
             </div>
 
             <div className="hidden xl:flex items-center gap-4 border-l border-[#262930] pl-4 font-mono text-[11px]">
@@ -235,14 +256,13 @@ const Header = ({ selectedCoin: selectedCoinProp }) => {
 
           <div className="lg:hidden min-w-0 rounded-lg border border-[#262930] bg-[#15181C] px-2.5 py-1.5">
             <div className="flex items-center gap-1.5">
-              <p className="text-[10px] font-black text-white">{symbol}/USDT</p>
+              <p className="text-[10px] font-black text-white">{selectedSymbol}/USDT</p>
               <span
                 className={`text-[10px] font-bold ${
                   isPositive ? "text-[#0ECB81]" : "text-[#F6465D]"
                 }`}
               >
-                {isPositive ? "+" : ""}
-                {market.change24h.toFixed(2)}%
+                {formatChange(market.change24h)}
               </span>
             </div>
             <p
