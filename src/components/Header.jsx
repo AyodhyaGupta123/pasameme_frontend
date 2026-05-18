@@ -2,6 +2,14 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { COIN_SOURCE_MAP } from "../config/coinSources";
+import {
+  Bell,
+  ChevronDown,
+  CircleDollarSign,
+  LogOut,
+  ShieldCheck,
+  Wallet,
+} from "lucide-react";
 
 const Header = ({ selectedCoin: selectedCoinProp }) => {
   const { user, logout } = useAuth();
@@ -32,7 +40,9 @@ const Header = ({ selectedCoin: selectedCoinProp }) => {
   const selectedSymbol = selectedCoin?.symbol?.toUpperCase() || "BTC";
   const coinInfo = COIN_SOURCE_MAP[selectedSymbol];
   const isBinance = coinInfo?.exchange === "BINANCE";
-  const streamSymbol = coinInfo?.symbolPair?.toLowerCase() || `${selectedSymbol.toLowerCase()}usdt`;
+  const streamSymbol =
+    coinInfo?.symbolPair?.toLowerCase() ||
+    `${selectedSymbol.toLowerCase()}usdt`;
   const isPositive = market.change24h >= 0;
 
   useEffect(() => {
@@ -161,10 +171,14 @@ const Header = ({ selectedCoin: selectedCoinProp }) => {
   };
 
   const getInitials = (userData) => {
-    if (userData?.username) return userData.username.charAt(0).toUpperCase();
-    if (userData?.name) return userData.name.charAt(0).toUpperCase();
-    if (userData?.email) return userData.email.charAt(0).toUpperCase();
-    return "?";
+    const raw = userData?.username || userData?.name || userData?.email || "U";
+    const parts = String(raw).trim().split(" ");
+
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    }
+
+    return raw.charAt(0).toUpperCase();
   };
 
   const displayName = (() => {
@@ -183,220 +197,207 @@ const Header = ({ selectedCoin: selectedCoinProp }) => {
   })();
 
   return (
-    <header className="sticky top-0 z-100 w-full border-b border-[#262930] bg-[#0B0E11]/95 backdrop-blur-xl">
-      <div className="h-16 px-3 sm:px-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <Link
-            to="/dashboard"
-            className="flex items-center shrink-0 rounded-lg transition hover:opacity-90"
+<header className="sticky top-0 z-100 w-full bg-[#0B0E11]/95 backdrop-blur-xl">
+  <div className="min-h-[60px] px-3 sm:px-5 flex items-center justify-between gap-2">
+    <div className="flex items-center gap-2 min-w-0 flex-1">
+      <Link
+        to="/dashboard"
+        className="flex items-center shrink-0 rounded-xl transition hover:opacity-90"
+      >
+        <img
+          src="/logo.png"
+          alt="PasaMeme"
+          className="h-8 sm:h-10 w-auto object-contain"
+        />
+      </Link>
+
+      <div className="min-w-0 flex-1 rounded-xl bg-[#11151A] px-2.5 py-1.5 sm:px-3 sm:py-2 lg:max-w-fit">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <p className="truncate text-[10px] sm:text-xs font-black text-white">
+            {selectedSymbol}/USDT
+          </p>
+
+          <span className="rounded bg-[#FCD535]/10 px-1.5 py-0.5 text-[8px] sm:text-[9px] font-black text-[#FCD535]">
+            SPOT
+          </span>
+
+          <span
+            className={`text-[10px] sm:text-xs font-black ${
+              isPositive ? "text-[#0ECB81]" : "text-[#F6465D]"
+            }`}
           >
-            <img
-              src="/logo.png"
-              alt="PasaMeme"
-              className="h-10 sm:h-10 w-auto object-contain"
-            />
-          </Link>
-
-          <div className="hidden lg:flex items-center gap-4 rounded-xl border border-[#262930] bg-[#15181C] px-4 py-2 shadow-sm">
-            <div className="min-w-22.5">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-black text-white">
-                  {selectedSymbol}/USDT
-                </span>
-                <span className="rounded border border-[#FCD535]/20 bg-[#FCD535]/10 px-1.5 py-0.5 text-[9px] font-bold text-[#FCD535]">
-                  SPOT
-                </span>
-              </div>
-              <p className="mt-0.5 font-mono text-[10px] text-slate-500">
-                Spot market price
-              </p>
-            </div>
-
-            <div
-              className={`font-mono text-lg font-black transition-all duration-300 ${
-                priceDirection === "up"
-                  ? "scale-105 text-[#0ECB81]"
-                  : priceDirection === "down"
-                  ? "scale-105 text-[#F6465D]"
-                  : isPositive
-                  ? "text-[#0ECB81]"
-                  : "text-[#F6465D]"
-              }`}
-            >
-              ${formatPrice(market.price)}
-            </div>
-
-            <div
-              className={`rounded-md px-2 py-1 font-mono text-xs font-bold ${
-                isPositive
-                  ? "bg-[#0ECB81]/10 text-[#0ECB81]"
-                  : "bg-[#F6465D]/10 text-[#F6465D]"
-              }`}
-            >
-              {formatChange(market.change24h)}
-            </div>
-
-            <div className="hidden xl:flex items-center gap-4 border-l border-[#262930] pl-4 font-mono text-[11px]">
-              <div>
-                <span className="text-slate-500">High </span>
-                <span className="text-white">${formatPrice(market.high24h)}</span>
-              </div>
-
-              <div>
-                <span className="text-slate-500">Low </span>
-                <span className="text-white">${formatPrice(market.low24h)}</span>
-              </div>
-
-              <div>
-                <span className="text-slate-500">Vol </span>
-                <span className="text-white">{formatVolume(market.volume)}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="lg:hidden min-w-0 rounded-lg border border-[#262930] bg-[#15181C] px-2.5 py-1.5">
-            <div className="flex items-center gap-1.5">
-              <p className="text-[10px] font-black text-white">{selectedSymbol}/USDT</p>
-              <span
-                className={`text-[10px] font-bold ${
-                  isPositive ? "text-[#0ECB81]" : "text-[#F6465D]"
-                }`}
-              >
-                {formatChange(market.change24h)}
-              </span>
-            </div>
-            <p
-              className={`font-mono text-xs font-black ${
-                priceDirection === "down" ? "text-[#F6465D]" : "text-[#0ECB81]"
-              }`}
-            >
-              ${formatPrice(market.price)}
-            </p>
-          </div>
+            {formatChange(market.change24h)}
+          </span>
         </div>
 
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          <button
-            onClick={() => navigate("/wallet")}
-            className="hidden sm:flex items-center rounded-lg border border-[#262930] bg-[#15181C] px-3 py-2 text-xs font-bold text-[#FCD535] transition hover:bg-[#1E2329]"
+        <div className="mt-0.5 flex items-center gap-2 min-w-0">
+          <p
+            className={`font-mono text-xs sm:text-sm lg:text-lg font-black ${
+              priceDirection === "down" ? "text-[#F6465D]" : "text-[#0ECB81]"
+            }`}
           >
-            Wallet
-          </button>
+            ${formatPrice(market.price)}
+          </p>
 
-          <button
-            onClick={() => navigate("/wallet")}
-            className="sm:hidden flex h-9 w-9 items-center justify-center rounded-lg border border-[#262930] bg-[#15181C] text-[#FCD535]"
-            title="Wallet"
-          >
-            $
-          </button>
-
-          <div className="relative" ref={notificationRef}>
-            <button
-              onClick={() => setIsNotificationOpen(!isNotificationOpen)}
-              className="relative flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-[#15181C] hover:text-white"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.7}
-                stroke="currentColor"
-                className="h-5 w-5"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31M5 19.5A2.5 2.5 0 017.5 22h9a2.5 2.5 0 010-5"
-                />
-              </svg>
-
-              <span className="absolute right-2 top-2 h-2 w-2 rounded-full border border-[#0B0E11] bg-[#F6465D]" />
-            </button>
-
-            {isNotificationOpen && (
-              <div className="absolute right-0 top-full mt-2 w-72 overflow-hidden rounded-xl border border-[#262930] bg-[#1E2329] shadow-2xl">
-                <div className="border-b border-[#262930] px-4 py-3">
-                  <p className="text-sm font-bold text-white">Notifications</p>
-                  <p className="text-[11px] text-slate-500">
-                    Latest wallet and market alerts
-                  </p>
-                </div>
-
-                <div className="p-4 text-sm text-slate-400">
-                  No new notifications.
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="relative" ref={profileRef}>
-            <button
-              onClick={() => setIsProfileOpen(!isProfileOpen)}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-[#FCD535] text-sm font-black text-black ring-2 ring-black transition hover:scale-105"
-            >
-              {getInitials(user)}
-            </button>
-
-            {isProfileOpen && (
-              <div className="absolute right-0 top-full mt-2 w-64 overflow-hidden rounded-xl border border-[#262930] bg-[#1E2228] shadow-2xl">
-                <div className="border-b border-[#262930] bg-[#15181C] p-4">
-                  <p className="truncate text-[13px] font-bold text-white">
-                    {displayName}
-                  </p>
-
-                  <p className="truncate text-[10px] text-slate-400">
-                    {user?.email || "-"}
-                  </p>
-
-                  <div className="mt-3 flex items-center justify-between border-t border-white/5 pt-3">
-                    <span className="text-[10px] text-slate-500">
-                      Spot Balance
-                    </span>
-
-                    <p className="font-mono text-[12px] font-bold text-[#0ECB81]">
-                      $
-                      {wallet?.usdBalance?.toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                      })}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="p-1">
-                  <button
-                    onClick={() => {
-                      navigate("/wallet");
-                      setIsProfileOpen(false);
-                    }}
-                    className="w-full rounded px-4 py-2.5 text-left text-[12px] text-slate-300 hover:bg-[#262930]"
-                  >
-                    My Assets
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      navigate("/faq");
-                      setIsProfileOpen(false);
-                    }}
-                    className="w-full rounded px-4 py-2.5 text-left text-[12px] text-yellow-400 hover:bg-[#262930]"
-                  >
-                    FAQ & Terms
-                  </button>
-
-                  <button
-                    onClick={logout}
-                    className="w-full rounded px-4 py-2.5 text-left text-[12px] text-red-400 hover:bg-red-900/10"
-                  >
-                    Logout
-                  </button>
-                </div>
-              </div>
-            )}
+          <div className="hidden lg:flex items-center gap-3 font-mono text-[11px]">
+            <span className="text-slate-500">
+              H <b className="text-white">${formatPrice(market.high24h)}</b>
+            </span>
+            <span className="text-slate-500">
+              L <b className="text-white">${formatPrice(market.low24h)}</b>
+            </span>
+            <span className="text-slate-500">
+              V <b className="text-white">{formatVolume(market.volume)}</b>
+            </span>
           </div>
         </div>
       </div>
-    </header>
+    </div>
+
+    <div className="flex items-center gap-1.5 shrink-0">
+      <button
+        onClick={() => navigate("/wallet")}
+        className="hidden sm:inline-flex items-center gap-2 rounded-xl bg-[#FCD535]/10 px-3 py-2 text-xs font-black text-[#FCD535] transition hover:bg-[#FCD535]/15"
+      >
+        <Wallet className="h-4 w-4" />
+        Wallet
+      </button>
+
+      <button
+        onClick={() => navigate("/wallet")}
+        className="sm:hidden flex h-9 w-9 items-center justify-center rounded-xl bg-[#FCD535]/10 text-[#FCD535]"
+        title="Wallet"
+      >
+        <CircleDollarSign className="h-5 w-5" />
+      </button>
+
+      <div className="relative" ref={notificationRef}>
+        <button
+          onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+          className="relative flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-[#11151A] text-slate-400 transition hover:bg-[#181D24] hover:text-white"
+        >
+          <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
+          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#F6465D]" />
+        </button>
+
+        {isNotificationOpen && (
+          <div className="absolute right-0 top-full mt-3 w-[calc(100vw-24px)] sm:w-80 overflow-hidden rounded-2xl bg-[#11151A] shadow-2xl">
+            <div className="bg-[#181D24] px-4 py-3">
+              <p className="text-sm font-black text-white">Notifications</p>
+              <p className="text-[11px] text-slate-500">
+                Latest wallet and market alerts
+              </p>
+            </div>
+
+            <div className="p-4">
+              <div className="rounded-xl bg-[#0B0E11] p-4 text-center">
+                <p className="text-sm font-semibold text-slate-300">
+                  No new notifications
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Market and wallet alerts will appear here.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="relative" ref={profileRef}>
+        <button
+          onClick={() => setIsProfileOpen(!isProfileOpen)}
+          className="flex items-center gap-2 rounded-xl bg-[#11151A] px-1.5 py-1.5 transition hover:bg-[#181D24]"
+        >
+          <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#FCD535] to-[#F0B90B] text-xs font-black text-black">
+            {getInitials(user)}
+          </div>
+
+          <div className="hidden md:block text-left">
+            <p className="max-w-24 truncate text-xs font-bold text-white">
+              {displayName}
+            </p>
+            <p className="font-mono text-[10px] font-semibold text-[#0ECB81]">
+              $
+              {wallet?.usdBalance?.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+              })}
+            </p>
+          </div>
+
+          <ChevronDown className="hidden md:block h-4 w-4 text-slate-500" />
+        </button>
+
+        {isProfileOpen && (
+          <div className="absolute right-0 top-full mt-3 w-[calc(100vw-24px)] sm:w-72 overflow-hidden rounded-2xl bg-[#11151A] shadow-2xl">
+            <div className="bg-[#181D24] p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-[#FCD535] to-[#F0B90B] text-sm font-black text-black">
+                  {getInitials(user)}
+                </div>
+
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-black text-white">
+                    {displayName}
+                  </p>
+                  <p className="truncate text-[11px] text-slate-400">
+                    {user?.email || "-"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-xl bg-[#0B0E11] p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-slate-500">
+                    Spot Balance
+                  </span>
+
+                  <p className="font-mono text-sm font-black text-[#0ECB81]">
+                    $
+                    {wallet?.usdBalance?.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                    })}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-2">
+              <button
+                onClick={() => {
+                  navigate("/wallet");
+                  setIsProfileOpen(false);
+                }}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-xs font-semibold text-slate-300 hover:bg-[#181D24]"
+              >
+                <Wallet className="h-4 w-4 text-[#FCD535]" />
+                My Assets
+              </button>
+
+              <button
+                onClick={() => {
+                  navigate("/faq");
+                  setIsProfileOpen(false);
+                }}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-xs font-semibold text-slate-300 hover:bg-[#181D24]"
+              >
+                <ShieldCheck className="h-4 w-4 text-[#0ECB81]" />
+                FAQ & Terms
+              </button>
+
+              <button
+                onClick={logout}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-xs font-semibold text-[#F6465D] hover:bg-[#F6465D]/10"
+              >
+                <LogOut className="h-4 w-4" />
+                Logout
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+</header>
   );
 };
 
