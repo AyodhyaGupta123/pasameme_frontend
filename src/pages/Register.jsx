@@ -1,21 +1,40 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 
 const Register = () => {
   const { register } = useAuth();
   const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     username: "",
     email: "",
     password: "",
+    referralCode: "",
   });
+
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+
+    if (ref) {
+      setFormData((prev) => ({
+        ...prev,
+        referralCode: ref.toUpperCase(),
+      }));
+    }
+  }, []);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]: name === "referralCode" ? value.toUpperCase() : value,
+    }));
   };
 
   const handleRegister = async (e) => {
@@ -24,9 +43,8 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const { username, email, password } = formData;
+      const { username, email, password, referralCode } = formData;
 
-      // Client-side validation
       if (!username || !email || !password) {
         setError("All fields are required");
         setLoading(false);
@@ -38,7 +56,14 @@ const Register = () => {
         setLoading(false);
         return;
       }
-      await register(username, email, password);
+
+      await register(
+        username.trim(),
+        email.trim(),
+        password,
+        referralCode.trim()
+      );
+
       setLoading(false);
       navigate("/");
     } catch (err) {
@@ -59,11 +84,11 @@ const Register = () => {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-6 shadow-xl rounded-xl border border-gray-100">
           <form className="space-y-5" onSubmit={handleRegister}>
-            {/* Username Field */}
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Username
               </label>
+
               <input
                 type="text"
                 name="username"
@@ -75,11 +100,11 @@ const Register = () => {
               />
             </div>
 
-            {/* Email Field */}
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Email Address
               </label>
+
               <input
                 type="email"
                 name="email"
@@ -91,11 +116,11 @@ const Register = () => {
               />
             </div>
 
-            {/* Password Field */}
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Password
               </label>
+
               <input
                 type="password"
                 name="password"
@@ -108,14 +133,33 @@ const Register = () => {
               />
             </div>
 
-            {/* Error Message */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Referral Code
+              </label>
+
+              <input
+                type="text"
+                name="referralCode"
+                value={formData.referralCode}
+                onChange={handleChange}
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm uppercase"
+                placeholder="Enter referral code"
+              />
+
+              {formData.referralCode && (
+                <p className="mt-1 text-xs text-green-600">
+                  Referral code applied.
+                </p>
+              )}
+            </div>
+
             {error && (
               <div className="text-red-500 text-sm bg-red-50 p-2 rounded border border-red-200">
                 ⚠️ {error}
               </div>
             )}
 
-            {/* Register Button */}
             <button
               type="submit"
               disabled={loading}
@@ -125,7 +169,6 @@ const Register = () => {
             </button>
           </form>
 
-          {/* Login Link */}
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
               Already have an account?{" "}
@@ -140,7 +183,6 @@ const Register = () => {
           </div>
         </div>
 
-        {/* Benefits Cards - Simple Version */}
         <div className="mt-6 grid grid-cols-3 gap-2">
           {[
             { label: "Bonus", val: "$100K" },

@@ -1,8 +1,22 @@
 import React, { useEffect, useState } from "react";
-import ManualQRCode from "../components/ManualQRCode";
 import api from "../api/axios";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
+import {
+  Copy,
+  Check,
+  Users,
+  TrendingUp,
+  Percent,
+  AlertCircle,
+  Share2,
+} from "lucide-react";
+import {
+  FaFacebookF,
+  FaWhatsapp,
+  FaTelegramPlane,
+  FaTwitter,
+} from "react-icons/fa";
 
 const WalletPage = () => {
   const navigate = useNavigate();
@@ -27,54 +41,65 @@ const WalletPage = () => {
   const [withdrawMessage, setWithdrawMessage] = useState("");
 
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [copied, setCopied] = useState(false);
+
+  const [referralData, setReferralData] = useState({
+    referralCode: "",
+    referralLink: "",
+    totalReferrals: 0,
+    referralEarnings: 0,
+  });
+
+  const formatMoney = (value) =>
+    Number(value || 0).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+
+  const getUserId = () => user?._id || user?.id || "";
+
+  const getReferralCode = () => {
+    const id = getUserId();
+    return `PASA${id ? id.slice(-6).toUpperCase() : "USER"}`;
+  };
 
   const canWithdraw = () => {
     if (!lastUpdated) return false;
-
     const last = new Date(lastUpdated);
+    if (Number.isNaN(last.getTime())) return false;
     const now = new Date();
     const diff = (now - last) / (1000 * 60 * 60 * 24);
-
     return diff >= 7;
   };
-
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate("/");
-      return;
-    }
-
-    if (user) {
-      fetchWalletData();
-    }
-  }, [user, authLoading, navigate]);
 
   const fetchWalletData = async () => {
     try {
       setLoading(true);
+      setError(null);
 
       const token =
         localStorage.getItem("authToken") || localStorage.getItem("token");
 
       if (!token) {
         setError("Session expired. Please login again.");
+        setLoading(false);
         return;
       }
 
       const res = await api.get("/header/wallet");
 
       if (res.data?.success) {
+        const walletData = res.data.wallet || {};
+
         setWallet({
-          usdBalance: Number(res.data.wallet?.usdBalance || 0),
+          usdBalance: Number(walletData.usdBalance || 0),
           realUsdBalance: Number(
-            res.data.wallet?.realUsdBalance ?? res.data.wallet?.usdBalance ?? 0
+            walletData.realUsdBalance ?? walletData.usdBalance ?? 0
           ),
-          tokenBalance: Number(res.data.wallet?.tokenBalance || 0),
+          tokenBalance: Number(walletData.tokenBalance || 0),
         });
 
-        setLastUpdated(
-          res.data.wallet?.updatedAt || res.data.wallet?.createdAt || null
-        );
+        setLastUpdated(walletData.updatedAt || walletData.createdAt || null);
       }
     } catch (err) {
       if (err.response?.status === 401) {
@@ -86,6 +111,85 @@ const WalletPage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchReferralData = async () => {
+    try {
+      const res = await api.get("/auth/referral-data");
+
+      const code = res.data?.referralCode || getReferralCode();
+      const baseUrl = window.location.origin;
+
+      setReferralData({
+        referralCode: code,
+        referralLink: `${baseUrl}/signup?ref=${code}`,
+        totalReferrals: Number(res.data?.totalReferrals || 0),
+        referralEarnings: Number(res.data?.referralEarnings || 0),
+      });
+    } catch {
+      const code = getReferralCode();
+
+      setReferralData({
+        referralCode: code,
+        referralLink: `${window.location.origin}/signup?ref=${code}`,
+        totalReferrals: 0,
+        referralEarnings: 0,
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/");
+      return;
+    }
+
+    if (user) {
+      fetchWalletData();
+      fetchReferralData();
+    }
+  }, [user, authLoading, navigate]);
+
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(referralData.referralLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  const shareOnWhatsApp = () => {
+    const message = `Join PasaMeme Trading with my referral code ${referralData.referralCode}. ${referralData.referralLink}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank");
+  };
+
+  const shareOnTwitter = () => {
+    const text = `Join PasaMeme Trading using my referral code: ${referralData.referralCode}. ${referralData.referralLink}`;
+    window.open(
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`,
+      "_blank"
+    );
+  };
+
+  const shareOnFacebook = () => {
+    window.open(
+      `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+        referralData.referralLink
+      )}`,
+      "_blank"
+    );
+  };
+
+  const shareOnTelegram = () => {
+    const message = `Join PasaMeme Trading with referral code ${referralData.referralCode}.`;
+    window.open(
+      `https://t.me/share/url?url=${encodeURIComponent(
+        referralData.referralLink
+      )}&text=${encodeURIComponent(message)}`,
+      "_blank"
+    );
   };
 
   const handleManualDeposit = async () => {
@@ -156,13 +260,11 @@ const WalletPage = () => {
       const res = await api.post("/auth/withdraw", { amount });
 
       if (res.data?.success) {
-        setWithdrawMessage(
-          "Withdrawal request submitted. Await admin approval."
-        );
+        setWithdrawMessage("Withdrawal request submitted. Await admin approval.");
 
         setWallet((prev) => ({
           ...prev,
-          realUsdBalance: prev.realUsdBalance - amount,
+          realUsdBalance: Number(prev.realUsdBalance || 0) - amount,
         }));
 
         setWithdrawAmount("");
@@ -178,7 +280,7 @@ const WalletPage = () => {
     }
   };
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-[#0b0e11]">
         <div className="h-10 w-10 border-4 border-slate-600 border-t-emerald-500 rounded-full animate-spin" />
@@ -186,8 +288,8 @@ const WalletPage = () => {
     );
   }
 
-  const activeUsdBalance = wallet.realUsdBalance;
-  const portfolioValue = activeUsdBalance + wallet.tokenBalance * 0.05;
+  const portfolioValue =
+    Number(wallet.realUsdBalance || 0) + Number(wallet.tokenBalance || 0) * 0.05;
 
   return (
     <div className="min-h-screen w-full bg-[#0b0e11] text-slate-200">
@@ -223,10 +325,7 @@ const WalletPage = () => {
                 </p>
 
                 <h1 className="text-4xl md:text-5xl font-semibold text-white">
-                  $
-                  {portfolioValue.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                  })}
+                  ${formatMoney(portfolioValue)}
                 </h1>
               </div>
 
@@ -239,25 +338,20 @@ const WalletPage = () => {
               <div className="bg-[#0b0e11] border border-white/5 rounded-xl p-4">
                 <p className="text-xs text-slate-500">Available Balance</p>
                 <p className="mt-1 text-xl font-semibold text-white">
-                  $
-                  {wallet.realUsdBalance.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                  })}
+                  ${formatMoney(wallet.realUsdBalance)}
                 </p>
               </div>
 
               <div className="bg-[#0b0e11] border border-white/5 rounded-xl p-4">
                 <p className="text-xs text-slate-500">Token Balance</p>
                 <p className="mt-1 text-xl font-semibold text-amber-400">
-                  {wallet.tokenBalance.toLocaleString()} PM
+                  {Number(wallet.tokenBalance || 0).toLocaleString()} PM
                 </p>
               </div>
 
               <div className="bg-[#0b0e11] border border-white/5 rounded-xl p-4">
                 <p className="text-xs text-slate-500">Daily Limit</p>
-                <p className="mt-1 text-xl font-semibold text-white">
-                  $10,000
-                </p>
+                <p className="mt-1 text-xl font-semibold text-white">$10,000</p>
               </div>
             </div>
           </div>
@@ -333,6 +427,160 @@ const WalletPage = () => {
         </section>
 
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 bg-[#11151c] border border-white/5 rounded-2xl p-6 space-y-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Users size={18} className="text-emerald-400" />
+                <h3 className="text-white font-semibold">Refer & Earn</h3>
+              </div>
+              <p className="text-xs text-slate-500">
+                Share your referral link and earn rewards when friends join.
+              </p>
+            </div>
+
+            <div className="bg-[#0b0e11] border border-emerald-500/30 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-slate-500">Your Referral Code</p>
+                  <p className="text-lg font-bold text-emerald-400 mt-1">
+                    {referralData.referralCode}
+                  </p>
+                </div>
+
+                <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 text-xs font-semibold">
+                  Active
+                </span>
+              </div>
+
+              <div className="border-t border-white/5 pt-3">
+                <p className="text-xs text-slate-500 mb-2">Referral Link</p>
+
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={referralData.referralLink}
+                    className="flex-1 px-3 py-2 rounded-lg bg-[#0b0e11] border border-white/10 text-white text-xs outline-none"
+                  />
+
+                  <button
+                    onClick={copyToClipboard}
+                    className={`px-4 py-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-2 ${
+                      copied
+                        ? "bg-emerald-500/30 text-emerald-400 border border-emerald-500/50"
+                        : "bg-[#FCD535] text-black hover:brightness-110"
+                    }`}
+                  >
+                    {copied ? (
+                      <>
+                        <Check size={14} /> Copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={14} /> Copy
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs uppercase tracking-wider text-slate-500 flex items-center gap-2">
+                <Share2 size={14} /> Share On
+              </p>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <button
+                  onClick={shareOnWhatsApp}
+                  className="flex items-center justify-center gap-2 px-3 py-3 rounded-lg bg-[#25D366]/10 border border-[#25D366]/30 text-[#25D366] hover:bg-[#25D366]/20 transition text-sm font-semibold"
+                >
+                  <FaWhatsapp size={16} />
+                  <span className="hidden sm:inline">WhatsApp</span>
+                </button>
+
+                <button
+                  onClick={shareOnTwitter}
+                  className="flex items-center justify-center gap-2 px-3 py-3 rounded-lg bg-[#1DA1F2]/10 border border-[#1DA1F2]/30 text-[#1DA1F2] hover:bg-[#1DA1F2]/20 transition text-sm font-semibold"
+                >
+                  <FaTwitter size={16} />
+                  <span className="hidden sm:inline">Twitter</span>
+                </button>
+
+                <button
+                  onClick={shareOnTelegram}
+                  className="flex items-center justify-center gap-2 px-3 py-3 rounded-lg bg-[#0088cc]/10 border border-[#0088cc]/30 text-[#0088cc] hover:bg-[#0088cc]/20 transition text-sm font-semibold"
+                >
+                  <FaTelegramPlane size={16} />
+                  <span className="hidden sm:inline">Telegram</span>
+                </button>
+
+                <button
+                  onClick={shareOnFacebook}
+                  className="flex items-center justify-center gap-2 px-3 py-3 rounded-lg bg-[#1877F2]/10 border border-[#1877F2]/30 text-[#1877F2] hover:bg-[#1877F2]/20 transition text-sm font-semibold"
+                >
+                  <FaFacebookF size={16} />
+                  <span className="hidden sm:inline">Facebook</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-[#11151c] border border-white/5 rounded-2xl p-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <TrendingUp size={18} className="text-emerald-400" />
+              <h4 className="text-sm uppercase tracking-wider text-slate-400">
+                Referral Stats
+              </h4>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-[#0b0e11] rounded-xl p-4 border border-white/5">
+                <div className="flex items-center gap-2 mb-2">
+                  <Users size={14} className="text-slate-500" />
+                  <p className="text-xs text-slate-500">Total Referrals</p>
+                </div>
+
+                <p className="text-2xl font-bold text-white">
+                  {Number(referralData.totalReferrals || 0)}
+                </p>
+              </div>
+
+              <div className="bg-[#0b0e11] rounded-xl p-4 border border-white/5">
+                <div className="flex items-center gap-2 mb-2">
+                  <TrendingUp size={14} className="text-emerald-400" />
+                  <p className="text-xs text-slate-500">Referral Earnings</p>
+                </div>
+
+                <p className="text-2xl font-bold text-emerald-400">
+                  ${formatMoney(referralData.referralEarnings)}
+                </p>
+              </div>
+
+              <div className="bg-[#0b0e11] rounded-xl p-4 border border-white/5">
+                <div className="flex items-center gap-2 mb-2">
+                  <Percent size={14} className="text-amber-400" />
+                  <p className="text-xs text-slate-500">Commission Rate</p>
+                </div>
+
+                <p className="text-2xl font-bold text-amber-400">10%</p>
+              </div>
+            </div>
+
+            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3 flex gap-2">
+              <AlertCircle
+                size={16}
+                className="text-emerald-400 flex-shrink-0 mt-0.5"
+              />
+
+              <p className="text-[11px] leading-relaxed text-emerald-300">
+                Earn 10% commission on every referral's first deposit.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-4">
             <h3 className="text-sm uppercase tracking-wider text-slate-400">
               Assets
@@ -346,10 +594,7 @@ const WalletPage = () => {
                 </div>
 
                 <p className="font-semibold text-white">
-                  $
-                  {wallet.realUsdBalance.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                  })}
+                  ${formatMoney(wallet.realUsdBalance)}
                 </p>
               </div>
 
@@ -375,9 +620,7 @@ const WalletPage = () => {
               </div>
 
               {withdrawMessage && (
-                <p className="mt-3 text-sm text-red-300">
-                  {withdrawMessage}
-                </p>
+                <p className="mt-3 text-sm text-red-300">{withdrawMessage}</p>
               )}
 
               {!canWithdraw() && (
@@ -394,7 +637,7 @@ const WalletPage = () => {
               </div>
 
               <p className="font-semibold text-amber-400">
-                {wallet.tokenBalance.toLocaleString()} PM
+                {Number(wallet.tokenBalance || 0).toLocaleString()} PM
               </p>
             </div>
           </div>
@@ -457,10 +700,6 @@ const WalletPage = () => {
             </table>
           </div>
         </section>
-
-        {/* <section>
-          <ManualQRCode />
-        </section> */}
       </main>
 
       <footer className="mt-12 py-6 text-center text-xs text-slate-500">
