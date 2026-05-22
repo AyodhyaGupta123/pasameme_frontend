@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import api from "../api/axios";
 import { useAuth } from "../context/AuthContext.jsx";
 import { COIN_SOURCE_MAP } from "../config/coinSources";
 import {
@@ -18,6 +19,13 @@ const Header = ({ selectedCoin: selectedCoinProp }) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [wallet, setWallet] = useState({ usdBalance: user?.balance || 0 });
+  const [notifications, setNotifications] = useState([]);
+
+  const previousPriceRef = useRef(null);
+  const profileRef = useRef(null);
+  const notificationRef = useRef(null);
+
+  const unreadCount = notifications.filter((item) => !item.read).length;
 
   const [market, setMarket] = useState({
     price: 0,
@@ -28,10 +36,6 @@ const Header = ({ selectedCoin: selectedCoinProp }) => {
   });
 
   const [priceDirection, setPriceDirection] = useState("neutral");
-
-  const previousPriceRef = useRef(null);
-  const profileRef = useRef(null);
-  const notificationRef = useRef(null);
 
   const selectedCoin =
     selectedCoinProp ||
@@ -51,6 +55,24 @@ const Header = ({ selectedCoin: selectedCoinProp }) => {
     }
   }, [user]);
 
+  const fetchNotifications = async () => {
+    try {
+      const res = await api.get("/notifications/my");
+
+      if (res.data?.success) {
+        setNotifications(res.data.notifications || []);
+      }
+    } catch {
+      setNotifications([]);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchNotifications();
+    }
+  }, [user]);
+
   useEffect(() => {
     let socket;
     let reconnectTimeout;
@@ -60,7 +82,7 @@ const Header = ({ selectedCoin: selectedCoinProp }) => {
       if (!isBinance) return;
 
       socket = new WebSocket(
-        `wss://stream.binance.com:9443/ws/${streamSymbol}@ticker`
+        `wss://stream.binance.com:9443/ws/${streamSymbol}@ticker`,
       );
 
       socket.onmessage = (event) => {
@@ -191,213 +213,249 @@ const Header = ({ selectedCoin: selectedCoinProp }) => {
       .replace(/\s+/g, " ")
       .split(" ")
       .map((part) =>
-        part ? part.charAt(0).toUpperCase() + part.slice(1).toLowerCase() : ""
+        part ? part.charAt(0).toUpperCase() + part.slice(1).toLowerCase() : "",
       )
       .join(" ");
   })();
 
   return (
-<header className="sticky top-0 z-100 w-full bg-[#0B0E11]/95 backdrop-blur-xl">
-  <div className="min-h-[60px] px-3 sm:px-5 flex items-center justify-between gap-2">
-    <div className="flex items-center gap-2 min-w-0 flex-1">
-      <Link
-        to="/dashboard"
-        className="flex items-center shrink-0 rounded-xl transition hover:opacity-90"
-      >
-        <img
-          src="/logo.png"
-          alt="PasaMeme"
-          className="h-8 sm:h-10 w-auto object-contain"
-        />
-      </Link>
-
-      <div className="min-w-0 flex-1 rounded-xl bg-[#11151A] px-2.5 py-1.5 sm:px-3 sm:py-2 lg:max-w-fit">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <p className="truncate text-[10px] sm:text-xs font-black text-white">
-            {selectedSymbol}/USDT
-          </p>
-
-          <span className="rounded bg-[#FCD535]/10 px-1.5 py-0.5 text-[8px] sm:text-[9px] font-black text-[#FCD535]">
-            SPOT
-          </span>
-
-          <span
-            className={`text-[10px] sm:text-xs font-black ${
-              isPositive ? "text-[#0ECB81]" : "text-[#F6465D]"
-            }`}
+    <header className="sticky top-0 z-100 w-full bg-[#0B0E11]/95 backdrop-blur-xl">
+      <div className="min-h-[60px] px-3 sm:px-5 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <Link
+            to="/dashboard"
+            className="flex items-center shrink-0 rounded-xl transition hover:opacity-90"
           >
-            {formatChange(market.change24h)}
-          </span>
-        </div>
+            <img
+              src="/logo.png"
+              alt="PasaMeme"
+              className="h-8 sm:h-10 w-auto object-contain"
+            />
+          </Link>
 
-        <div className="mt-0.5 flex items-center gap-2 min-w-0">
-          <p
-            className={`font-mono text-xs sm:text-sm lg:text-lg font-black ${
-              priceDirection === "down" ? "text-[#F6465D]" : "text-[#0ECB81]"
-            }`}
-          >
-            ${formatPrice(market.price)}
-          </p>
-
-          <div className="hidden lg:flex items-center gap-3 font-mono text-[11px]">
-            <span className="text-slate-500">
-              H <b className="text-white">${formatPrice(market.high24h)}</b>
-            </span>
-            <span className="text-slate-500">
-              L <b className="text-white">${formatPrice(market.low24h)}</b>
-            </span>
-            <span className="text-slate-500">
-              V <b className="text-white">{formatVolume(market.volume)}</b>
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div className="flex items-center gap-1.5 shrink-0">
-      <button
-        onClick={() => navigate("/wallet")}
-        className="hidden sm:inline-flex items-center gap-2 rounded-xl bg-[#FCD535]/10 px-3 py-2 text-xs font-black text-[#FCD535] transition hover:bg-[#FCD535]/15"
-      >
-        <Wallet className="h-4 w-4" />
-        Wallet
-      </button>
-
-      <button
-        onClick={() => navigate("/wallet")}
-        className="sm:hidden flex h-9 w-9 items-center justify-center rounded-xl bg-[#FCD535]/10 text-[#FCD535]"
-        title="Wallet"
-      >
-        <CircleDollarSign className="h-5 w-5" />
-      </button>
-
-      <div className="relative" ref={notificationRef}>
-        <button
-          onClick={() => setIsNotificationOpen(!isNotificationOpen)}
-          className="relative flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-[#11151A] text-slate-400 transition hover:bg-[#181D24] hover:text-white"
-        >
-          <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
-          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#F6465D]" />
-        </button>
-
-        {isNotificationOpen && (
-          <div className="absolute right-0 top-full mt-3 w-[calc(100vw-24px)] sm:w-80 overflow-hidden rounded-2xl bg-[#11151A] shadow-2xl">
-            <div className="bg-[#181D24] px-4 py-3">
-              <p className="text-sm font-black text-white">Notifications</p>
-              <p className="text-[11px] text-slate-500">
-                Latest wallet and market alerts
+          <div className="min-w-0 flex-1 rounded-xl bg-[#11151A] px-2.5 py-1.5 sm:px-3 sm:py-2 lg:max-w-fit">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <p className="truncate text-[10px] sm:text-xs font-black text-white">
+                {selectedSymbol}/USDT
               </p>
+
+              <span className="rounded bg-[#FCD535]/10 px-1.5 py-0.5 text-[8px] sm:text-[9px] font-black text-[#FCD535]">
+                SPOT
+              </span>
+
+              <span
+                className={`text-[10px] sm:text-xs font-black ${
+                  isPositive ? "text-[#0ECB81]" : "text-[#F6465D]"
+                }`}
+              >
+                {formatChange(market.change24h)}
+              </span>
             </div>
 
-            <div className="p-4">
-              <div className="rounded-xl bg-[#0B0E11] p-4 text-center">
-                <p className="text-sm font-semibold text-slate-300">
-                  No new notifications
+            <div className="mt-0.5 flex items-center gap-2 min-w-0">
+              <p
+                className={`font-mono text-xs sm:text-sm lg:text-lg font-black ${
+                  priceDirection === "down"
+                    ? "text-[#F6465D]"
+                    : "text-[#0ECB81]"
+                }`}
+              >
+                ${formatPrice(market.price)}
+              </p>
+
+              <div className="hidden lg:flex items-center gap-3 font-mono text-[11px]">
+                <span className="text-slate-500">
+                  H <b className="text-white">${formatPrice(market.high24h)}</b>
+                </span>
+                <span className="text-slate-500">
+                  L <b className="text-white">${formatPrice(market.low24h)}</b>
+                </span>
+                <span className="text-slate-500">
+                  V <b className="text-white">{formatVolume(market.volume)}</b>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={() => navigate("/wallet")}
+            className="hidden sm:inline-flex items-center gap-2 rounded-xl bg-[#FCD535]/10 px-3 py-2 text-xs font-black text-[#FCD535] transition hover:bg-[#FCD535]/15"
+          >
+            <Wallet className="h-4 w-4" />
+            Wallet
+          </button>
+
+          <button
+            onClick={() => navigate("/wallet")}
+            className="sm:hidden flex h-9 w-9 items-center justify-center rounded-xl bg-[#FCD535]/10 text-[#FCD535]"
+            title="Wallet"
+          >
+            <CircleDollarSign className="h-5 w-5" />
+          </button>
+
+          <div className="relative" ref={notificationRef}>
+            <button
+              onClick={() => setIsNotificationOpen((prev) => !prev)}
+              className="relative flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-[#11151A] text-slate-400 transition hover:bg-[#181D24] hover:text-white"
+            >
+              <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
+
+              {unreadCount > 0 && (
+                <span className="absolute -right-1 -top-1 min-w-5 h-5 px-1 rounded-full bg-[#F6465D] text-[10px] font-bold text-white flex items-center justify-center">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </button>
+
+            {isNotificationOpen && (
+              <div className="fixed left-3 right-3 top-[66px] z-[9999] max-h-[75vh] overflow-hidden rounded-2xl bg-[#11151A] shadow-2xl border border-white/5 sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-3 sm:w-80">
+                <div className="bg-[#181D24] px-4 py-3">
+                  <p className="text-sm font-black text-white">Notifications</p>
+                  <p className="text-[11px] text-slate-500">
+                    Latest wallet and market alerts
+                  </p>
+                </div>
+
+                <div className="p-3 max-h-[60vh] sm:max-h-80 overflow-y-auto">
+                  {notifications.length > 0 ? (
+                    <div className="space-y-2">
+                      {notifications.map((item) => (
+                        <div
+                          key={item._id}
+                          className="rounded-xl bg-[#0B0E11] p-3 border border-white/5"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="text-xs font-black text-[#FCD535]">
+                              {item.type?.toUpperCase() || "SYSTEM"}
+                            </p>
+
+                            {!item.read && (
+                              <span className="h-2 w-2 rounded-full bg-[#F6465D] mt-1" />
+                            )}
+                          </div>
+
+                          <p className="mt-1 text-xs leading-relaxed text-slate-300 break-words">
+                            {item.message}
+                          </p>
+
+                          <p className="mt-2 text-[10px] text-slate-600">
+                            {new Date(item.createdAt).toLocaleString()}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl bg-[#0B0E11] p-4 text-center">
+                      <p className="text-sm font-semibold text-slate-300">
+                        No new notifications
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Market and wallet alerts will appear here.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="relative" ref={profileRef}>
+            <button
+              onClick={() => setIsProfileOpen((prev) => !prev)}
+              className="flex items-center gap-2 rounded-xl bg-[#11151A] px-1.5 py-1.5 transition hover:bg-[#181D24]"
+            >
+              <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#FCD535] to-[#F0B90B] text-xs font-black text-black">
+                {getInitials(user)}
+              </div>
+
+              <div className="hidden md:block text-left">
+                <p className="max-w-24 truncate text-xs font-bold text-white">
+                  {displayName}
                 </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  Market and wallet alerts will appear here.
+                <p className="font-mono text-[10px] font-semibold text-[#0ECB81]">
+                  $
+                  {wallet?.usdBalance?.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                  })}
                 </p>
               </div>
-            </div>
-          </div>
-        )}
-      </div>
 
-      <div className="relative" ref={profileRef}>
-        <button
-          onClick={() => setIsProfileOpen(!isProfileOpen)}
-          className="flex items-center gap-2 rounded-xl bg-[#11151A] px-1.5 py-1.5 transition hover:bg-[#181D24]"
-        >
-          <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#FCD535] to-[#F0B90B] text-xs font-black text-black">
-            {getInitials(user)}
-          </div>
+              <ChevronDown className="hidden md:block h-4 w-4 text-slate-500" />
+            </button>
 
-          <div className="hidden md:block text-left">
-            <p className="max-w-24 truncate text-xs font-bold text-white">
-              {displayName}
-            </p>
-            <p className="font-mono text-[10px] font-semibold text-[#0ECB81]">
-              $
-              {wallet?.usdBalance?.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-              })}
-            </p>
-          </div>
+            {isProfileOpen && (
+              <div className="absolute right-0 top-full mt-3 w-[calc(100vw-24px)] sm:w-72 overflow-hidden rounded-2xl bg-[#11151A] shadow-2xl border border-white/5">
+                <div className="bg-[#181D24] p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-[#FCD535] to-[#F0B90B] text-sm font-black text-black">
+                      {getInitials(user)}
+                    </div>
 
-          <ChevronDown className="hidden md:block h-4 w-4 text-slate-500" />
-        </button>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-black text-white">
+                        {displayName}
+                      </p>
+                      <p className="truncate text-[11px] text-slate-400">
+                        {user?.email || "-"}
+                      </p>
+                    </div>
+                  </div>
 
-        {isProfileOpen && (
-          <div className="absolute right-0 top-full mt-3 w-[calc(100vw-24px)] sm:w-72 overflow-hidden rounded-2xl bg-[#11151A] shadow-2xl">
-            <div className="bg-[#181D24] p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-[#FCD535] to-[#F0B90B] text-sm font-black text-black">
-                  {getInitials(user)}
+                  <div className="mt-4 rounded-xl bg-[#0B0E11] p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-semibold text-slate-500">
+                        Spot Balance
+                      </span>
+
+                      <p className="font-mono text-sm font-black text-[#0ECB81]">
+                        $
+                        {wallet?.usdBalance?.toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                        })}
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-black text-white">
-                    {displayName}
-                  </p>
-                  <p className="truncate text-[11px] text-slate-400">
-                    {user?.email || "-"}
-                  </p>
+                <div className="p-2">
+                  <button
+                    onClick={() => {
+                      navigate("/wallet");
+                      setIsProfileOpen(false);
+                    }}
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-xs font-semibold text-slate-300 hover:bg-[#181D24]"
+                  >
+                    <Wallet className="h-4 w-4 text-[#FCD535]" />
+                    My Assets
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      navigate("/faq");
+                      setIsProfileOpen(false);
+                    }}
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-xs font-semibold text-slate-300 hover:bg-[#181D24]"
+                  >
+                    <ShieldCheck className="h-4 w-4 text-[#0ECB81]" />
+                    FAQ & Terms
+                  </button>
+
+                  <button
+                    onClick={logout}
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-xs font-semibold text-[#F6465D] hover:bg-[#F6465D]/10"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Logout
+                  </button>
                 </div>
               </div>
-
-              <div className="mt-4 rounded-xl bg-[#0B0E11] p-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-semibold text-slate-500">
-                    Spot Balance
-                  </span>
-
-                  <p className="font-mono text-sm font-black text-[#0ECB81]">
-                    $
-                    {wallet?.usdBalance?.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                    })}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-2">
-              <button
-                onClick={() => {
-                  navigate("/wallet");
-                  setIsProfileOpen(false);
-                }}
-                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-xs font-semibold text-slate-300 hover:bg-[#181D24]"
-              >
-                <Wallet className="h-4 w-4 text-[#FCD535]" />
-                My Assets
-              </button>
-
-              <button
-                onClick={() => {
-                  navigate("/faq");
-                  setIsProfileOpen(false);
-                }}
-                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-xs font-semibold text-slate-300 hover:bg-[#181D24]"
-              >
-                <ShieldCheck className="h-4 w-4 text-[#0ECB81]" />
-                FAQ & Terms
-              </button>
-
-              <button
-                onClick={logout}
-                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-xs font-semibold text-[#F6465D] hover:bg-[#F6465D]/10"
-              >
-                <LogOut className="h-4 w-4" />
-                Logout
-              </button>
-            </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
-    </div>
-  </div>
-</header>
+    </header>
   );
 };
 

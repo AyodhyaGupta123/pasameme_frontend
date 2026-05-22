@@ -35,6 +35,7 @@ const WalletPage = () => {
   const [transactionId, setTransactionId] = useState("");
   const [depositLoading, setDepositLoading] = useState(false);
   const [depositMessage, setDepositMessage] = useState("");
+  const [paymentUpiId, setPaymentUpiId] = useState("");
 
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [withdrawLoading, setWithdrawLoading] = useState(false);
@@ -55,6 +56,31 @@ const WalletPage = () => {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
+
+   const fetchPaymentUpiId = async () => {
+  try {
+    const res = await api.get("/upi");
+
+    if (res.data?.success) {
+      setPaymentUpiId(res.data.upiId || "");
+    }
+  } catch {
+    setPaymentUpiId("");
+  }
+};
+
+useEffect(() => {
+  if (!authLoading && !user) {
+    navigate("/");
+    return;
+  }
+
+  if (user) {
+    fetchWalletData();
+    fetchReferralData();
+    fetchPaymentUpiId();
+  }
+}, [user, authLoading, navigate]);
 
   const getUserId = () => user?._id || user?.id || "";
 
@@ -376,7 +402,7 @@ const WalletPage = () => {
                 <div className="flex justify-between text-sm gap-3">
                   <span className="text-slate-500">UPI ID</span>
                   <span className="text-white font-medium text-right">
-                    8175847774@okbizaxis
+                   {paymentUpiId || "UPI not available"}
                   </span>
                 </div>
 
