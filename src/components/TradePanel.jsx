@@ -16,9 +16,18 @@ const TradePanel = ({ inputPrice, selectedCoin }) => {
   const coinSymbol = selectedCoin?.symbol || "BTC";
 
   const currentPrice = useMemo(() => {
-    if (!inputPrice) return 0;
-    return Number(String(inputPrice).replace(/,/g, ""));
-  }, [inputPrice]);
+    const raw =
+      inputPrice ||
+      selectedCoin?.price ||
+      selectedCoin?.currentPrice ||
+      selectedCoin?.lastPrice ||
+      selectedCoin?.marketPrice ||
+      0;
+
+    const num = Number(String(raw).replace(/,/g, ""));
+
+    return Number.isFinite(num) ? num : 0;
+  }, [inputPrice, selectedCoin]);
 
   const executionPrice =
     orderType === "limit" && Number(limitPrice) > 0
@@ -37,7 +46,7 @@ const TradePanel = ({ inputPrice, selectedCoin }) => {
 
         if (res.data?.success) {
           const walletBalance = Number(
-            res.data.wallet?.realUsdBalance ?? res.data.wallet?.usdBalance ?? 0
+            res.data.wallet?.realUsdBalance ?? res.data.wallet?.usdBalance ?? 0,
           );
           setBalance(walletBalance);
         }
@@ -66,13 +75,21 @@ const TradePanel = ({ inputPrice, selectedCoin }) => {
       return false;
     }
 
+    if (!executionPrice || executionPrice <= 0) {
+      alert("Live price not loaded yet. Please wait few seconds.");
+      return false;
+    }
+
     if (tradeAmount > balance) {
       alert("Insufficient balance. Please add funds to your wallet.");
       navigate("/wallet");
       return false;
     }
 
-    if (orderType === "limit" && (!Number(limitPrice) || Number(limitPrice) <= 0)) {
+    if (
+      orderType === "limit" &&
+      (!Number(limitPrice) || Number(limitPrice) <= 0)
+    ) {
       alert("Please enter a valid limit price.");
       return false;
     }
@@ -89,7 +106,7 @@ const TradePanel = ({ inputPrice, selectedCoin }) => {
       const user = JSON.parse(localStorage.getItem("user") || "{}");
 
       const res = await api.post("/trade/place", {
-        userId: user._id,
+        userId: user._id || user.id,
         side,
         symbol: coinSymbol,
         price: executionPrice,
@@ -99,9 +116,15 @@ const TradePanel = ({ inputPrice, selectedCoin }) => {
       });
 
       const remainingBalance =
-        res.data?.remainingBalance ?? balance - Number(amount);
+        res.data?.wallet?.realUsdBalance ??
+        res.data?.wallet?.usdBalance ??
+        res.data?.remainingBalance ??
+        balance - Number(amount);
 
       setBalance(Number(remainingBalance));
+
+      // IMPORTANT
+      window.dispatchEvent(new Event("walletUpdated"));
 
       setOrderData({
         side,
@@ -120,7 +143,7 @@ const TradePanel = ({ inputPrice, selectedCoin }) => {
       alert(
         error?.response?.data?.message ||
           error?.response?.data?.error ||
-          "Trade failed. Please try again."
+          "Trade failed. Please try again.",
       );
     } finally {
       setLoadingSide("");
@@ -289,7 +312,9 @@ const TradePanel = ({ inputPrice, selectedCoin }) => {
 
           <div className="flex justify-between">
             <span className="text-slate-500">Execution Price</span>
-            <span>${executionPrice ? executionPrice.toLocaleString() : "0.00"}</span>
+            <span>
+              ${executionPrice ? executionPrice.toLocaleString() : "0.00"}
+            </span>
           </div>
         </div>
       </div>

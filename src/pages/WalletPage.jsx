@@ -57,31 +57,6 @@ const WalletPage = () => {
       maximumFractionDigits: 2,
     });
 
-   const fetchPaymentUpiId = async () => {
-  try {
-    const res = await api.get("/upi");
-
-    if (res.data?.success) {
-      setPaymentUpiId(res.data.upiId || "");
-    }
-  } catch {
-    setPaymentUpiId("");
-  }
-};
-
-useEffect(() => {
-  if (!authLoading && !user) {
-    navigate("/");
-    return;
-  }
-
-  if (user) {
-    fetchWalletData();
-    fetchReferralData();
-    fetchPaymentUpiId();
-  }
-}, [user, authLoading, navigate]);
-
   const getUserId = () => user?._id || user?.id || "";
 
   const getReferralCode = () => {
@@ -89,18 +64,21 @@ useEffect(() => {
     return `PASA${id ? id.slice(-6).toUpperCase() : "USER"}`;
   };
 
-  const canWithdraw = () => {
-    if (!lastUpdated) return false;
-    const last = new Date(lastUpdated);
-    if (Number.isNaN(last.getTime())) return false;
-    const now = new Date();
-    const diff = (now - last) / (1000 * 60 * 60 * 24);
-    return diff >= 7;
+  const fetchPaymentUpiId = async () => {
+    try {
+      const res = await api.get("/upi");
+
+      if (res.data?.success) {
+        setPaymentUpiId(res.data.upiId || "");
+      }
+    } catch {
+      setPaymentUpiId("");
+    }
   };
 
-  const fetchWalletData = async () => {
+  const fetchWalletData = async (showLoader = true) => {
     try {
-      setLoading(true);
+      if (showLoader) setLoading(true);
       setError(null);
 
       const token =
@@ -108,7 +86,7 @@ useEffect(() => {
 
       if (!token) {
         setError("Session expired. Please login again.");
-        setLoading(false);
+        if (showLoader) setLoading(false);
         return;
       }
 
@@ -117,11 +95,13 @@ useEffect(() => {
       if (res.data?.success) {
         const walletData = res.data.wallet || {};
 
+        const balance = Number(
+          walletData.realUsdBalance ?? walletData.usdBalance ?? 0,
+        );
+
         setWallet({
-          usdBalance: Number(walletData.usdBalance || 0),
-          realUsdBalance: Number(
-            walletData.realUsdBalance ?? walletData.usdBalance ?? 0
-          ),
+          usdBalance: Number(walletData.usdBalance ?? balance),
+          realUsdBalance: balance,
           tokenBalance: Number(walletData.tokenBalance || 0),
         });
 
@@ -135,7 +115,7 @@ useEffect(() => {
 
       setError(err.response?.data?.error || "Unauthorized access");
     } finally {
-      setLoading(false);
+      if (showLoader) setLoading(false);
     }
   };
 
@@ -171,10 +151,42 @@ useEffect(() => {
     }
 
     if (user) {
-      fetchWalletData();
+      fetchWalletData(true);
       fetchReferralData();
+      fetchPaymentUpiId();
     }
   }, [user, authLoading, navigate]);
+
+  useEffect(() => {
+    const handleWalletUpdate = () => {
+      fetchWalletData(false);
+    };
+
+    const handleFocus = () => {
+      if (user) fetchWalletData(false);
+    };
+
+    window.addEventListener("walletUpdated", handleWalletUpdate);
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      window.removeEventListener("walletUpdated", handleWalletUpdate);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [user]);
+
+  const canWithdraw = () => {
+    if (!lastUpdated) return false;
+
+    const last = new Date(lastUpdated);
+
+    if (Number.isNaN(last.getTime())) return false;
+
+    const now = new Date();
+    const diff = (now - last) / (1000 * 60 * 60 * 24);
+
+    return diff >= 7;
+  };
 
   const copyToClipboard = async () => {
     try {
@@ -193,28 +205,30 @@ useEffect(() => {
 
   const shareOnTwitter = () => {
     const text = `Join PasaMeme Trading using my referral code: ${referralData.referralCode}. ${referralData.referralLink}`;
+
     window.open(
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`,
-      "_blank"
+      "_blank",
     );
   };
 
   const shareOnFacebook = () => {
     window.open(
       `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
-        referralData.referralLink
+        referralData.referralLink,
       )}`,
-      "_blank"
+      "_blank",
     );
   };
 
   const shareOnTelegram = () => {
     const message = `Join PasaMeme Trading with referral code ${referralData.referralCode}.`;
+
     window.open(
       `https://t.me/share/url?url=${encodeURIComponent(
-        referralData.referralLink
+        referralData.referralLink,
       )}&text=${encodeURIComponent(message)}`,
-      "_blank"
+      "_blank",
     );
   };
 
@@ -243,16 +257,17 @@ useEffect(() => {
 
       if (res.data?.success) {
         setDepositMessage(
-          "Deposit request submitted successfully. Balance will be updated after admin verification."
+          "Deposit request submitted successfully. Balance will be updated after admin verification.",
         );
         setDepositAmount("");
         setTransactionId("");
+        fetchWalletData(false);
       } else {
         setDepositMessage(res.data?.message || "Deposit request failed.");
       }
     } catch (err) {
       setDepositMessage(
-        err?.response?.data?.message || "Deposit request failed."
+        err?.response?.data?.message || "Deposit request failed.",
       );
     } finally {
       setDepositLoading(false);
@@ -272,34 +287,30 @@ useEffect(() => {
       return;
     }
 
-    if (!canWithdraw()) {
-      setWithdrawMessage(
-        "Withdrawal allowed only after 7 days from last deposit/update."
-      );
-      return;
-    }
-
     try {
       setWithdrawLoading(true);
       setWithdrawMessage("");
 
-      const res = await api.post("/auth/withdraw", { amount });
+      const res = await api.post("/withdraw/request", {
+        amount,
+      });
 
       if (res.data?.success) {
-        setWithdrawMessage("Withdrawal request submitted. Await admin approval.");
-
-        setWallet((prev) => ({
-          ...prev,
-          realUsdBalance: Number(prev.realUsdBalance || 0) - amount,
-        }));
+        setWithdrawMessage(
+          "Withdrawal request submitted successfully. Await admin approval.",
+        );
 
         setWithdrawAmount("");
+        fetchWalletData(false);
+        window.dispatchEvent(new Event("walletUpdated"));
       } else {
         setWithdrawMessage(res.data?.message || "Withdrawal failed.");
       }
     } catch (err) {
       setWithdrawMessage(
-        err?.response?.data?.message || "Withdrawal failed."
+        err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          "Withdrawal request failed.",
       );
     } finally {
       setWithdrawLoading(false);
@@ -315,7 +326,8 @@ useEffect(() => {
   }
 
   const portfolioValue =
-    Number(wallet.realUsdBalance || 0) + Number(wallet.tokenBalance || 0) * 0.05;
+    Number(wallet.realUsdBalance || 0) +
+    Number(wallet.tokenBalance || 0) * 0.05;
 
   return (
     <div className="min-h-screen w-full bg-[#0b0e11] text-slate-200">
@@ -402,7 +414,7 @@ useEffect(() => {
                 <div className="flex justify-between text-sm gap-3">
                   <span className="text-slate-500">UPI ID</span>
                   <span className="text-white font-medium text-right">
-                   {paymentUpiId || "UPI not available"}
+                    {paymentUpiId || "UPI not available"}
                   </span>
                 </div>
 
@@ -459,6 +471,7 @@ useEffect(() => {
                 <Users size={18} className="text-emerald-400" />
                 <h3 className="text-white font-semibold">Refer & Earn</h3>
               </div>
+
               <p className="text-xs text-slate-500">
                 Share your referral link and earn rewards when friends join.
               </p>
@@ -638,7 +651,7 @@ useEffect(() => {
 
                 <button
                   onClick={handleWithdraw}
-                  disabled={withdrawLoading || !canWithdraw()}
+                  disabled={withdrawLoading}
                   className="px-6 py-3 rounded-lg bg-red-500 text-white text-sm font-semibold hover:brightness-110 disabled:opacity-60"
                 >
                   {withdrawLoading ? "Processing..." : "Withdraw"}

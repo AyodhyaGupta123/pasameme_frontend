@@ -49,10 +49,43 @@ const Header = ({ selectedCoin: selectedCoinProp }) => {
     `${selectedSymbol.toLowerCase()}usdt`;
   const isPositive = market.change24h >= 0;
 
+  const fetchWalletBalance = async () => {
+    try {
+      const res = await api.get("/header/wallet");
+
+      if (res.data?.success) {
+        const walletData = res.data.wallet || {};
+
+        setWallet({
+          usdBalance: Number(
+            walletData.realUsdBalance ||
+              walletData.usdBalance ||
+              user?.balance ||
+              0
+          ),
+        });
+      }
+    } catch {
+      setWallet({ usdBalance: Number(user?.balance || 0) });
+    }
+  };
+
   useEffect(() => {
     if (user) {
-      setWallet({ usdBalance: Number(user.balance || 0) });
+      fetchWalletBalance();
     }
+  }, [user]);
+
+  useEffect(() => {
+    const handleWalletUpdate = () => {
+      fetchWalletBalance();
+    };
+
+    window.addEventListener("walletUpdated", handleWalletUpdate);
+
+    return () => {
+      window.removeEventListener("walletUpdated", handleWalletUpdate);
+    };
   }, [user]);
 
   const fetchNotifications = async () => {
@@ -82,7 +115,7 @@ const Header = ({ selectedCoin: selectedCoinProp }) => {
       if (!isBinance) return;
 
       socket = new WebSocket(
-        `wss://stream.binance.com:9443/ws/${streamSymbol}@ticker`,
+        `wss://stream.binance.com:9443/ws/${streamSymbol}@ticker`
       );
 
       socket.onmessage = (event) => {
@@ -213,7 +246,7 @@ const Header = ({ selectedCoin: selectedCoinProp }) => {
       .replace(/\s+/g, " ")
       .split(" ")
       .map((part) =>
-        part ? part.charAt(0).toUpperCase() + part.slice(1).toLowerCase() : "",
+        part ? part.charAt(0).toUpperCase() + part.slice(1).toLowerCase() : ""
       )
       .join(" ");
   })();
