@@ -16,6 +16,8 @@ const Orderbook = lazy(() => import("./components/Orderbook"));
 const TradePanel = lazy(() => import("./components/TradePanel"));
 const TradeModal = lazy(() => import("./components/TradeModal"));
 const CoinsList = lazy(() => import("./components/CoinsList"));
+const SupportBot = lazy(() => import("./components/SupportBot"));
+
 
 const App = () => {
   const [currentPrice, setCurrentPrice] = useState(null);
@@ -265,6 +267,9 @@ const App = () => {
             />
             <Route path="/faq" element={<FaqPage />} />
           </Routes>
+          
+          <SupportBot />
+
         </Suspense>
       </AuthProvider>
     </>
