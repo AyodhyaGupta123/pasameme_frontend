@@ -56,7 +56,9 @@ const SupportBot = () => {
           <div className="bg-[#0b0e11] px-4 py-3 flex items-center justify-between">
             <div>
               <h3 className="text-white font-bold text-sm">Support Chat</h3>
-              <p className="text-xs text-slate-500">Admin se baat karein</p>
+              <p className="text-xs text-slate-500">
+                Chat with an administrator
+              </p>
             </div>
 
             <button onClick={() => setOpen(false)} className="text-slate-400">
